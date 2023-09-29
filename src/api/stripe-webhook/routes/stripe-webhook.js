@@ -1,9 +1,11 @@
+"use strict";
+
 module.exports = {
   routes: [
     {
       method: "POST",
-      path: "/authorize-user",
-      handler: "authorize-user.authorizeUser",
+      path: "/stripe-webhook",
+      handler: "stripe-webhook.authorizeUser",
       config: {
         policies: [],
         middlewares: [],
