@@ -3,9 +3,11 @@ const Stripe = require("stripe");
 const unparsed = require("koa-body/unparsed.js");
 
 // @ts-ignore
-const stripe = new Stripe(process.env.STRIPE_TEST_SECRET_KEY);
+const stripe = new Stripe(process.env.STRIPE_TEST_SECRET_KEY, {
+  apiVersion: "2023-08-16",
+});
 
-const webhookSecret = "whsec_Hx3rZZRhLVAjlsgfrfyrfbzGnC0aVdfK";
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 module.exports = {
   async authorizeUser(ctx, next) {
@@ -25,46 +27,50 @@ module.exports = {
     }
 
     const { object } = event.data;
-    // Handle the event
-    switch (event.type) {
-      case "payment_intent.succeeded":
-        console.log(`PaymentIntent for ${object.amount} was successful!`);
-        break;
-      case "payment_method.attached":
-        const paymentMethod = event.data.object;
-        // Then define and call a method to handle the successful attachment of a PaymentMethod.
-        // handlePaymentMethodAttached(paymentMethod);
-        break;
-      default:
-        // Unexpected event type
-        console.log(`Unhandled event type ${event.type}.`);
-    }
 
     console.log(event);
 
     try {
-      const { email } = object;
-      // Buscar un usuario por correo electrónico
-      const user = await strapi
-        .query("plugin::users-permissions.user")
-        .findOne({ email }, ["id", "email", "blocked"]);
-
-      if (!user) return;
-      const updatedUser = await strapi.entityService.update(
-        "plugin::users-permissions.user",
-        user.id,
-        {
-          data: {
-            blocked: false,
-          },
-        }
-      );
-      return updatedUser;
     } catch (err) {
       ctx.badRequest("Error al procesar webhook stripe:", {
         moreDetails: err,
       });
       throw err;
+    }
+
+    // Handle Stripe events
+
+    try {
+      switch (event.type) {
+        case "invoice.payment_.succeeded":
+          const { email } = object;
+          // Buscar un usuario por correo electrónico despues del pago con el email que llega en el evento:
+          // (Podríamos pasar el id una vez creado el cliente en Strapi, y nos ahorramos buscarlo por email) ya que Koa solo tiene un metodo para actualizar y es por ID)
+          const user = await strapi
+            .query("plugin::users-permissions.user")
+            .findOne({ email }, ["id", "email", "blocked"]);
+          if (!user) return;
+
+          const updatedUser = await strapi.entityService.update(
+            "plugin::users-permissions.user",
+            user.id,
+            {
+              data: {
+                blocked: false,
+              },
+            }
+          );
+          console.log(
+            `Invoce payment for ${object.amount} was successful!\n User with email ${email} authorized!`
+          );
+          return updatedUser;
+        case "invoice.payment_.succeeded":
+        default:
+          // Unexpected event type
+          console.log(`Unhandled event type ${event.type}.`);
+      }
+    } catch (error) {
+      return ctx.badRequest(`Error al procesar el evento: ${error}`);
     }
   },
 };
