@@ -5,12 +5,14 @@ const unparsed = require("koa-body/unparsed.js");
 // @ts-ignore
 const stripe = new Stripe(process.env.STRIPE_TEST_SECRET_KEY);
 
-const webhookSecret = "whsec_Hx3rZZRhLVAjlsgfrfyrfbzGnC0aVdfK";
+const webhookSecret = "whsec_7jbjwRRUzK7cjHzlHOVAHx1JE23QviKa"; // cambiar cuando se lleve a producción y sustituirlo por variable de entorno
 
 module.exports = {
   async authorizeUser(ctx, next) {
     const sig = ctx.request.headers["stripe-signature"];
     let event;
+    console.log('este es el body RAW')
+    console.log(ctx.request.body)
     try {
       event = stripe.webhooks.constructEvent(
         ctx.request.body[unparsed],
